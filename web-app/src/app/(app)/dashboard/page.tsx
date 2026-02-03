@@ -26,6 +26,21 @@ interface QuizResult {
   totalQuestions: number;
   correctAnswers: number;
   passed: boolean;
+  attemptCount?: number;
+  completedAt: string;
+  pattern: {
+    title: string;
+    category: string;
+  };
+}
+
+interface QuizAttempt {
+  id: string;
+  patternSlug: string;
+  score: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  passed: boolean;
   completedAt: string;
   pattern: {
     title: string;
@@ -44,9 +59,11 @@ export default function DashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'best' | 'history'>('best');
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -60,19 +77,33 @@ export default function DashboardPage() {
       
       try {
         const token = Cookies.get('token');
-        const response = await fetch('http://localhost:3002/api/quiz/results', {
+        
+        // Fetch best results
+        const resultsResponse = await fetch('http://localhost:3002/api/quiz/results', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
 
-        if (!response.ok) {
+        if (!resultsResponse.ok) {
           throw new Error('Failed to fetch dashboard data');
         }
 
-        const data = await response.json();
-        setResults(data.results);
-        setStats(data.stats);
+        const resultsData = await resultsResponse.json();
+        setResults(resultsData.results);
+        setStats(resultsData.stats);
+
+        // Fetch all attempts
+        const attemptsResponse = await fetch('http://localhost:3002/api/quiz/attempts', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (attemptsResponse.ok) {
+          const attemptsData = await attemptsResponse.json();
+          setAttempts(attemptsData.attempts);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard');
       } finally {
@@ -163,10 +194,33 @@ export default function DashboardPage() {
         className="glass-card rounded-xl overflow-hidden"
       >
         <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Award className="w-5 h-5 text-accent" />
-            Quiz Results
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Award className="w-5 h-5 text-accent" />
+              Quiz Results
+            </h2>
+            {/* Tab switcher */}
+            <div className="flex bg-slate-800/50 p-1 rounded-lg">
+              <button
+                onClick={() => setActiveTab('best')}
+                className={cn(
+                  'px-3 py-1 text-xs rounded-md transition-colors',
+                  activeTab === 'best' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'
+                )}
+              >
+                Best Scores
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={cn(
+                  'px-3 py-1 text-xs rounded-md transition-colors',
+                  activeTab === 'history' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'
+                )}
+              >
+                All Attempts ({attempts.length})
+              </button>
+            </div>
+          </div>
           <button
             onClick={() => router.push('/education')}
             className="text-sm text-accent hover:text-accent-light transition-colors"
@@ -179,10 +233,12 @@ export default function DashboardPage() {
           <div className="p-8 text-center text-red-400">
             {error}
           </div>
-        ) : results.length === 0 ? (
+        ) : (activeTab === 'best' ? results : attempts).length === 0 ? (
           <div className="p-8 text-center">
             <BookOpen className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-            <p className="text-slate-400 mb-4">You haven't completed any quizzes yet</p>
+            <p className="text-slate-400 mb-4">
+              {activeTab === 'best' ? "You haven't completed any quizzes yet" : "No quiz attempts recorded"}
+            </p>
             <button
               onClick={() => router.push('/education')}
               className="px-4 py-2 bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors"
@@ -190,14 +246,14 @@ export default function DashboardPage() {
               Start Learning
             </button>
           </div>
-        ) : (
+        ) : activeTab === 'best' ? (
           <div className="divide-y divide-slate-700/50">
             {results.map((result, index) => (
               <motion.div
                 key={result.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 * index }}
+                transition={{ delay: 0.05 * index }}
                 className="p-4 hover:bg-slate-800/30 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -220,6 +276,11 @@ export default function DashboardPage() {
                       </h3>
                       <p className="text-sm text-slate-400 capitalize">
                         {result.pattern.category.replace('_', ' ')}
+                        {result.attemptCount && result.attemptCount > 1 && (
+                          <span className="ml-2 text-xs text-slate-500">
+                            ({result.attemptCount} attempts)
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -251,6 +312,51 @@ export default function DashboardPage() {
                         Review
                       </button>
                     )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-700/50 max-h-96 overflow-y-auto">
+            {attempts.map((attempt, index) => (
+              <motion.div
+                key={attempt.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.03 * Math.min(index, 10) }}
+                className="p-3 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      'w-8 h-8 rounded-lg flex items-center justify-center text-xs',
+                      attempt.passed 
+                        ? 'bg-green-500/20 text-green-400' 
+                        : 'bg-red-500/20 text-red-400'
+                    )}>
+                      {attempt.passed ? '✓' : '✗'}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-white text-sm">
+                        {attempt.pattern.title}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {new Date(attempt.completedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      'text-lg font-bold',
+                      attempt.score >= 70 ? 'text-green-400' : 'text-red-400'
+                    )}>
+                      {attempt.score}%
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {attempt.correctAnswers}/{attempt.totalQuestions}
+                    </div>
                   </div>
                 </div>
               </motion.div>

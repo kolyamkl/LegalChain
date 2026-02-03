@@ -23,7 +23,7 @@ const authenticateToken = (req: Request, res: Response, next: Function) => {
   }
 };
 
-// Submit quiz result
+// Submit quiz result - stores each attempt and updates best result
 router.post('/submit', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
@@ -32,22 +32,9 @@ router.post('/submit', authenticateToken, async (req: Request, res: Response) =>
     const score = Math.round((correctAnswers / totalQuestions) * 100);
     const passed = score >= 70;
 
-    const result = await prisma.quizResult.upsert({
-      where: {
-        userId_patternSlug: {
-          userId,
-          patternSlug,
-        },
-      },
-      update: {
-        score,
-        totalQuestions,
-        correctAnswers,
-        answers,
-        passed,
-        completedAt: new Date(),
-      },
-      create: {
+    // Always create a new attempt record
+    await prisma.quizAttempt.create({
+      data: {
         userId,
         patternSlug,
         score,
@@ -58,14 +45,76 @@ router.post('/submit', authenticateToken, async (req: Request, res: Response) =>
       },
     });
 
+    // Update or create the best result
+    const existingResult = await prisma.quizResult.findUnique({
+      where: {
+        userId_patternSlug: {
+          userId,
+          patternSlug,
+        },
+      },
+    });
+
+    let result;
+    if (existingResult) {
+      // Only update if new score is better or if now passed
+      if (score > existingResult.score || (passed && !existingResult.passed)) {
+        result = await prisma.quizResult.update({
+          where: {
+            userId_patternSlug: {
+              userId,
+              patternSlug,
+            },
+          },
+          data: {
+            score,
+            totalQuestions,
+            correctAnswers,
+            answers,
+            passed,
+            attemptCount: { increment: 1 },
+            completedAt: new Date(),
+          },
+        });
+      } else {
+        // Just increment attempt count
+        result = await prisma.quizResult.update({
+          where: {
+            userId_patternSlug: {
+              userId,
+              patternSlug,
+            },
+          },
+          data: {
+            attemptCount: { increment: 1 },
+          },
+        });
+      }
+    } else {
+      result = await prisma.quizResult.create({
+        data: {
+          userId,
+          patternSlug,
+          score,
+          totalQuestions,
+          correctAnswers,
+          answers,
+          passed,
+          attemptCount: 1,
+        },
+      });
+    }
+
     res.json({
       success: true,
       result: {
         id: result.id,
-        score: result.score,
-        passed: result.passed,
-        correctAnswers: result.correctAnswers,
-        totalQuestions: result.totalQuestions,
+        score,
+        passed,
+        correctAnswers,
+        totalQuestions,
+        attemptCount: result.attemptCount,
+        bestScore: result.score,
       },
     });
   } catch (error) {
@@ -139,6 +188,38 @@ router.get('/result/:patternSlug', authenticateToken, async (req: Request, res: 
   } catch (error) {
     console.error('Get quiz result error:', error);
     res.status(500).json({ error: 'Failed to get quiz result' });
+  }
+});
+
+// Get all quiz attempts for a user (for dashboard history)
+router.get('/attempts', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    const attempts = await prisma.quizAttempt.findMany({
+      where: { userId },
+      orderBy: { completedAt: 'desc' },
+      take: 50, // Limit to last 50 attempts
+    });
+
+    // Get pattern details
+    const patternSlugs = [...new Set(attempts.map((a: any) => a.patternSlug))];
+    const patterns = await prisma.educationPattern.findMany({
+      where: { slug: { in: patternSlugs } },
+      select: { slug: true, title: true, category: true },
+    });
+
+    const patternMap = new Map(patterns.map((p: any) => [p.slug, p]));
+
+    const enrichedAttempts = attempts.map((a: any) => ({
+      ...a,
+      pattern: patternMap.get(a.patternSlug) || { title: a.patternSlug, category: 'unknown' },
+    }));
+
+    res.json({ attempts: enrichedAttempts });
+  } catch (error) {
+    console.error('Get quiz attempts error:', error);
+    res.status(500).json({ error: 'Failed to get quiz attempts' });
   }
 });
 

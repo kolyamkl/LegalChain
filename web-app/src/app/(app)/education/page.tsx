@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Code, ChevronRight, CheckCircle, XCircle, Loader2, GraduationCap, Sparkles } from 'lucide-react';
+import { BookOpen, Code, ChevronRight, CheckCircle, XCircle, Loader2, GraduationCap, Sparkles, GitCompare, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { 
   getEducationPatterns, 
@@ -19,27 +19,40 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 type Tab = 'library' | 'custom';
 
-// Syntax highlighting component for Solidity code - renders actual colored spans
-function SyntaxHighlightedCode({ code }: { code: string; isVulnerable?: boolean }) {
+// Line highlight types for vulnerability analysis
+type LineHighlight = {
+  type: 'danger' | 'warning' | 'safe';
+  message: string;
+};
+
+type LineHighlights = Record<number, LineHighlight>;
+
+// Syntax highlighting component with vulnerability annotations
+function VulnerableCodeView({ 
+  code, 
+  highlights 
+}: { 
+  code: string; 
+  highlights: LineHighlights;
+}) {
+  const [hoveredLine, setHoveredLine] = useState<number | null>(null);
+
   const highlightLine = (line: string): React.ReactNode[] => {
     const tokens: React.ReactNode[] = [];
-    let remaining = line;
     let key = 0;
 
-    // Check for comment first
-    const commentMatch = remaining.match(/^(.*?)(\/\/.*)$/);
+    const commentMatch = line.match(/^(.*?)(\/\/.*)$/);
     if (commentMatch) {
       tokens.push(...highlightLine(commentMatch[1]));
       tokens.push(<span key={key++} className="text-slate-500">{commentMatch[2]}</span>);
       return tokens;
     }
 
-    // Tokenize the line
     const regex = /(\b(?:pragma|solidity|contract|function|public|private|external|internal|view|pure|payable|returns|return|if|else|for|while|require|mapping|address|uint256|uint|int|bool|string|bytes|memory|storage|calldata|msg|sender|value|block|timestamp|this|new|delete|true|false|import|is|abstract|interface|library|event|emit|modifier|constructor|fallback|receive)\b)|(\b\d+\b)|(["'][^"']*["'])|(\w+)|([^\w\s]+)|(\s+)/g;
     
     let match;
-    while ((match = regex.exec(remaining)) !== null) {
-      const [fullMatch, keyword, number, str, identifier, operator, whitespace] = match;
+    while ((match = regex.exec(line)) !== null) {
+      const [, keyword, number, str, identifier, operator, whitespace] = match;
       
       if (keyword) {
         tokens.push(<span key={key++} className="text-purple-400">{keyword}</span>);
@@ -48,20 +61,114 @@ function SyntaxHighlightedCode({ code }: { code: string; isVulnerable?: boolean 
       } else if (str) {
         tokens.push(<span key={key++} className="text-green-400">{str}</span>);
       } else if (identifier) {
-        // Check if previous token was 'function' or 'contract'
-        const prevToken = tokens[tokens.length - 2];
-        if (prevToken && typeof prevToken === 'object' && 'props' in prevToken) {
-          const prevText = (prevToken as React.ReactElement).props.children;
-          if (prevText === 'function') {
-            tokens.push(<span key={key++} className="text-yellow-300">{identifier}</span>);
-          } else if (prevText === 'contract' || prevText === 'interface' || prevText === 'library') {
-            tokens.push(<span key={key++} className="text-cyan-400">{identifier}</span>);
-          } else {
-            tokens.push(<span key={key++} className="text-slate-200">{identifier}</span>);
-          }
-        } else {
-          tokens.push(<span key={key++} className="text-slate-200">{identifier}</span>);
-        }
+        tokens.push(<span key={key++} className="text-slate-200">{identifier}</span>);
+      } else if (operator) {
+        tokens.push(<span key={key++} className="text-cyan-300">{operator}</span>);
+      } else if (whitespace) {
+        tokens.push(<span key={key++}>{whitespace}</span>);
+      }
+    }
+    
+    return tokens;
+  };
+
+  const getLineClass = (lineNum: number) => {
+    const highlight = highlights[lineNum];
+    if (!highlight) return '';
+    switch (highlight.type) {
+      case 'danger': return 'bg-red-500/20 border-l-2 border-red-500';
+      case 'warning': return 'bg-yellow-500/15 border-l-2 border-yellow-500';
+      case 'safe': return 'bg-green-500/15 border-l-2 border-green-500';
+      default: return '';
+    }
+  };
+
+  const lines = code.split('\n');
+  
+  return (
+    <div className="relative">
+      {lines.map((line, lineIndex) => {
+        const lineNum = lineIndex + 1;
+        const highlight = highlights[lineNum];
+        
+        return (
+          <div 
+            key={lineIndex} 
+            className={cn(
+              "flex relative group cursor-pointer transition-colors",
+              getLineClass(lineNum),
+              !highlight && "hover:bg-slate-800/30"
+            )}
+            onMouseEnter={() => highlight && setHoveredLine(lineNum)}
+            onMouseLeave={() => setHoveredLine(null)}
+          >
+            <span className="select-none text-slate-600 w-8 text-right pr-4 flex-shrink-0 border-r border-slate-700/30 mr-4">
+              {lineNum}
+            </span>
+            <code className="flex-1 whitespace-pre">{highlightLine(line)}</code>
+            
+            {/* Tooltip indicator */}
+            {highlight && (
+              <span className={cn(
+                "ml-2 opacity-50 group-hover:opacity-100 transition-opacity",
+                highlight.type === 'danger' && "text-red-400",
+                highlight.type === 'warning' && "text-yellow-400",
+                highlight.type === 'safe' && "text-green-400"
+              )}>
+                <Info className="w-3 h-3" />
+              </span>
+            )}
+            
+            {/* Tooltip */}
+            {hoveredLine === lineNum && highlight && (
+              <div className={cn(
+                "absolute right-4 top-full mt-1 z-50 px-3 py-2 rounded-lg text-xs max-w-sm shadow-xl whitespace-normal",
+                highlight.type === 'danger' && "bg-red-900/95 border border-red-500/50 text-red-100",
+                highlight.type === 'warning' && "bg-yellow-900/95 border border-yellow-500/50 text-yellow-100",
+                highlight.type === 'safe' && "bg-green-900/95 border border-green-500/50 text-green-100"
+              )}>
+                <div className="font-medium mb-1 flex items-center gap-1">
+                  {highlight.type === 'danger' && '⚠️ Security Issue'}
+                  {highlight.type === 'warning' && '⚡ Caution'}
+                  {highlight.type === 'safe' && '✓ Good Practice'}
+                </div>
+                {highlight.message}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Simple syntax highlighting for comparison view
+function SyntaxHighlightedCode({ code }: { code: string }) {
+  const highlightLine = (line: string): React.ReactNode[] => {
+    const tokens: React.ReactNode[] = [];
+    let key = 0;
+
+    const commentMatch = line.match(/^(.*?)(\/\/.*)$/);
+    if (commentMatch) {
+      tokens.push(...highlightLine(commentMatch[1]));
+      tokens.push(<span key={key++} className="text-slate-500">{commentMatch[2]}</span>);
+      return tokens;
+    }
+
+    const regex = /(\b(?:pragma|solidity|contract|function|public|private|external|internal|view|pure|payable|returns|return|if|else|for|while|require|mapping|address|uint256|uint|int|bool|string|bytes|memory|storage|calldata|msg|sender|value|block|timestamp|this|new|delete|true|false|import|is|abstract|interface|library|event|emit|modifier|constructor|fallback|receive)\b)|(\b\d+\b)|(["'][^"']*["'])|(\w+)|([^\w\s]+)|(\s+)/g;
+    
+    let match;
+    while ((match = regex.exec(line)) !== null) {
+      const [, keyword, number, str, identifier, operator, whitespace] = match;
+      
+      if (keyword) {
+        tokens.push(<span key={key++} className="text-purple-400">{keyword}</span>);
+      } else if (number) {
+        tokens.push(<span key={key++} className="text-orange-400">{number}</span>);
+      } else if (str) {
+        tokens.push(<span key={key++} className="text-green-400">{str}</span>);
+      } else if (identifier) {
+        tokens.push(<span key={key++} className="text-slate-200">{identifier}</span>);
       } else if (operator) {
         tokens.push(<span key={key++} className="text-cyan-300">{operator}</span>);
       } else if (whitespace) {
@@ -88,6 +195,54 @@ function SyntaxHighlightedCode({ code }: { code: string; isVulnerable?: boolean 
   );
 }
 
+// Generate line highlights based on pattern category
+function getVulnerabilityHighlights(pattern: EducationPattern): LineHighlights {
+  const highlights: LineHighlights = {};
+  const lines = pattern.vulnerable_code.split('\n');
+  
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
+    const trimmed = line.trim().toLowerCase();
+    
+    // Dangerous patterns (red)
+    if (trimmed.includes('.call{value') || trimmed.includes('.call.value')) {
+      highlights[lineNum] = { type: 'danger', message: 'External call that can be exploited for reentrancy attacks. State should be updated before this call.' };
+    } else if (trimmed.includes('tx.origin')) {
+      highlights[lineNum] = { type: 'danger', message: 'Using tx.origin for authorization is vulnerable to phishing attacks. Use msg.sender instead.' };
+    } else if (trimmed.includes('selfdestruct')) {
+      highlights[lineNum] = { type: 'danger', message: 'selfdestruct can be exploited if access control is weak. Ensure proper authorization.' };
+    } else if (trimmed.includes('delegatecall')) {
+      highlights[lineNum] = { type: 'danger', message: 'delegatecall executes code in the context of the calling contract. Can be exploited if target is untrusted.' };
+    } else if (trimmed.match(/balances\[.*\]\s*[-+]=/) && !trimmed.includes('require')) {
+      highlights[lineNum] = { type: 'danger', message: 'State change after external call - classic reentrancy vulnerability. Update state before external calls.' };
+    } else if (trimmed.includes('private') && trimmed.includes('bool') && trimmed.includes('cansell')) {
+      highlights[lineNum] = { type: 'danger', message: 'Hidden restriction variable - this is a honeypot pattern that traps users.' };
+    }
+    // Warning patterns (yellow)
+    else if (trimmed.includes('block.timestamp')) {
+      highlights[lineNum] = { type: 'warning', message: 'Block timestamp can be manipulated by miners within ~15 seconds. Avoid for critical logic.' };
+    } else if (trimmed.includes('block.number')) {
+      highlights[lineNum] = { type: 'warning', message: 'Block number can be predicted. Not suitable for randomness or time-sensitive operations.' };
+    } else if (trimmed.match(/\+|\-|\*/) && !trimmed.includes('safemath') && !trimmed.includes('unchecked')) {
+      if (trimmed.includes('uint') || trimmed.includes('int')) {
+        highlights[lineNum] = { type: 'warning', message: 'Arithmetic operation without overflow protection. Consider using SafeMath or Solidity 0.8+.' };
+      }
+    }
+    // Good practices (green)
+    else if (trimmed.includes('require(') || trimmed.includes('revert(')) {
+      highlights[lineNum] = { type: 'safe', message: 'Input validation with require/revert is a good security practice.' };
+    } else if (trimmed.includes('onlyowner') || trimmed.includes('modifier')) {
+      highlights[lineNum] = { type: 'safe', message: 'Access control modifier helps restrict function access to authorized users.' };
+    } else if (trimmed.includes('reentrancyguard') || trimmed.includes('nonreentrant')) {
+      highlights[lineNum] = { type: 'safe', message: 'ReentrancyGuard prevents reentrancy attacks effectively.' };
+    } else if (trimmed.includes('safemath')) {
+      highlights[lineNum] = { type: 'safe', message: 'SafeMath library prevents integer overflow/underflow vulnerabilities.' };
+    }
+  });
+  
+  return highlights;
+}
+
 function EducationPageContent() {
   const [activeTab, setActiveTab] = useState<Tab>('library');
   const [patterns, setPatterns] = useState<EducationPatternSummary[]>([]);
@@ -101,6 +256,7 @@ function EducationPageContent() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   
   const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
 
   useEffect(() => {
     const fetchPatterns = async () => {
@@ -225,119 +381,130 @@ function EducationPageContent() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="grid lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 lg:grid-cols-4 gap-4"
           >
-            <div className="lg:col-span-1 glass-card rounded-xl p-4">
-            <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-accent" />
-              Vulnerability Patterns
-            </h2>
-            {isLoadingPatterns ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-accent" />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {patterns.map((pattern) => (
-                  <button
-                    key={pattern.slug}
-                    onClick={() => handleSelectPattern(pattern.slug)}
-                    className={cn(
-                      'w-full flex items-center justify-between p-3 rounded-lg text-left transition-all duration-300',
-                      selectedPattern?.slug === pattern.slug
-                        ? 'bg-accent/10 border border-accent/30 shadow-lg shadow-accent/10'
-                        : 'hover:bg-slate-800/50 border border-transparent hover:border-slate-700'
-                    )}
-                  >
-                    <div>
-                      <div className="font-medium text-white text-sm">
-                        {pattern.title}
+            {/* Narrower sidebar */}
+            <div className="lg:col-span-1 glass-card rounded-xl p-3 max-h-[70vh] overflow-y-auto">
+              <h2 className="font-semibold text-white mb-3 flex items-center gap-2 text-sm">
+                <Sparkles className="w-4 h-4 text-accent" />
+                Patterns
+              </h2>
+              {isLoadingPatterns ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-accent" />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {patterns.map((pattern) => (
+                    <button
+                      key={pattern.slug}
+                      onClick={() => handleSelectPattern(pattern.slug)}
+                      className={cn(
+                        'w-full flex items-center justify-between p-2 rounded-lg text-left transition-all duration-300',
+                        selectedPattern?.slug === pattern.slug
+                          ? 'bg-accent/10 border border-accent/30'
+                          : 'hover:bg-slate-800/50 border border-transparent'
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium text-white text-xs truncate">
+                          {pattern.title}
+                        </div>
+                        <div className="text-[10px] text-slate-400 capitalize">
+                          {pattern.category.replace('_', ' ')}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400 capitalize">
-                        {pattern.category.replace('_', ' ')}
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                      <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <div className="lg:col-span-2 space-y-4">
-            {isLoadingPattern ? (
-              <div className="glass-card rounded-xl p-8 flex justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-accent" />
-              </div>
-            ) : selectedPattern ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-4"
-              >
-                <div className="glass-card rounded-xl overflow-hidden">
-                  <div className="p-4 border-b border-slate-700/50">
-                    <h2 className="text-xl font-semibold text-white">
-                      {selectedPattern.title}
-                    </h2>
-                    <span className="text-sm text-slate-500 capitalize">
-                      {selectedPattern.category.replace('_', ' ')}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-700/50">
-                    <div className="p-4 min-w-0">
-                      <h3 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded bg-red-500/20 flex items-center justify-center text-xs">✗</span>
-                        Vulnerable Code
-                      </h3>
+            {/* Wider content area */}
+            <div className="lg:col-span-3 space-y-4">
+              {isLoadingPattern ? (
+                <div className="glass-card rounded-xl p-8 flex justify-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                </div>
+              ) : selectedPattern ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  {/* Header with title and actions */}
+                  <div className="glass-card rounded-xl overflow-hidden">
+                    <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold text-white">
+                          {selectedPattern.title}
+                        </h2>
+                        <span className="text-sm text-slate-500 capitalize">
+                          {selectedPattern.category.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowCompareModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-sm text-white transition-colors"
+                      >
+                        <GitCompare className="w-4 h-4" />
+                        Compare to Fixed
+                      </motion.button>
+                    </div>
+                    
+                    {/* Only vulnerable code with highlights */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-red-400 flex items-center gap-2">
+                          <span className="w-5 h-5 rounded bg-red-500/20 flex items-center justify-center text-xs">✗</span>
+                          Vulnerable Code
+                        </h3>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500"></span> Dangerous</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-yellow-500"></span> Caution</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500"></span> Good</span>
+                        </div>
+                      </div>
                       <div className="bg-[#1e1e1e] rounded-lg overflow-hidden border border-slate-700/50">
                         <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/50 border-b border-slate-700/50">
-                          <span className="text-xs text-slate-500">Solidity</span>
-                          <span className="text-xs text-red-400">⚠ Vulnerable</span>
+                          <span className="text-xs text-slate-500">Solidity • Hover highlighted lines for details</span>
+                          <span className="text-xs text-red-400">⚠ Contains Vulnerabilities</span>
                         </div>
-                        <div className="p-4 text-xs font-mono leading-relaxed max-h-96 overflow-y-auto overflow-x-auto">
-                          <SyntaxHighlightedCode code={selectedPattern.vulnerable_code} />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4 min-w-0">
-                      <h3 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center text-xs">✓</span>
-                        Fixed Code
-                      </h3>
-                      <div className="bg-[#1e1e1e] rounded-lg overflow-hidden border border-slate-700/50">
-                        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/50 border-b border-slate-700/50">
-                          <span className="text-xs text-slate-500">Solidity</span>
-                          <span className="text-xs text-green-400">✓ Safe</span>
-                        </div>
-                        <div className="p-4 text-xs font-mono leading-relaxed max-h-96 overflow-y-auto overflow-x-auto">
-                          <SyntaxHighlightedCode code={selectedPattern.fixed_code} />
+                        <div className="p-4 text-xs font-mono leading-relaxed max-h-[50vh] overflow-y-auto overflow-x-auto">
+                          <VulnerableCodeView 
+                            code={selectedPattern.vulnerable_code} 
+                            highlights={getVulnerabilityHighlights(selectedPattern)}
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="glass-card rounded-xl p-4">
-                  <h3 className="font-semibold text-white mb-3">
-                    Explanation
-                  </h3>
-                  <div className="prose prose-sm prose-invert max-w-none">
-                    <div className="text-slate-300 whitespace-pre-wrap text-sm">
-                      {selectedPattern.explanation}
+                {/* Explanation and Quiz section - side by side */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2 glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-white mb-4 text-lg flex items-center gap-2">
+                      <Info className="w-5 h-5 text-accent" />
+                      Explanation
+                    </h3>
+                    <div className="prose prose-sm prose-invert max-w-none">
+                      <div className="text-slate-300 whitespace-pre-wrap text-sm leading-relaxed">
+                        {selectedPattern.explanation}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Take Quiz Button */}
-                <div className="glass-card rounded-xl p-4">
-                  <div className="flex items-center justify-between">
+                  {/* Take Quiz Button */}
+                  <div className="lg:col-span-1 glass-card rounded-xl p-5 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-semibold text-white mb-1">
-                        🧪 Test Your Knowledge
+                      <h3 className="font-semibold text-white mb-2 text-lg flex items-center gap-2">
+                        <GraduationCap className="w-5 h-5 text-accent" />
+                        Test Your Knowledge
                       </h3>
-                      <p className="text-sm text-slate-400">
+                      <p className="text-sm text-slate-400 mb-4">
                         Complete a quiz to verify your understanding of this vulnerability pattern
                       </p>
                     </div>
@@ -345,7 +512,7 @@ function EducationPageContent() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setShowQuizModal(true)}
-                      className="px-6 py-3 bg-gradient-to-r from-accent to-accent-dark text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-accent/40 transition-all flex items-center gap-2"
+                      className="w-full px-6 py-3 bg-gradient-to-r from-accent to-accent-dark text-white rounded-xl font-medium shadow-lg shadow-accent/20 hover:shadow-accent/40 transition-all flex items-center justify-center gap-2"
                     >
                       <GraduationCap className="w-5 h-5" />
                       Take Quiz
@@ -502,7 +669,93 @@ contract MyContract {
           onClose={() => setShowQuizModal(false)}
         />
       )}
+
+      {/* Compare Modal */}
+      {showCompareModal && selectedPattern && (
+        <CompareModal
+          pattern={selectedPattern}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
     </motion.div>
+  );
+}
+
+// Compare Modal Component - side by side comparison
+function CompareModal({ pattern, onClose }: { pattern: EducationPattern; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <GitCompare className="w-5 h-5 text-accent" />
+              Code Comparison: {pattern.title}
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Compare vulnerable code with the secure implementation
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <XCircle className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        {/* Content - Side by side */}
+        <div className="grid grid-cols-2 divide-x divide-slate-700/50 max-h-[70vh] overflow-hidden">
+          {/* Vulnerable Code */}
+          <div className="p-4 overflow-y-auto">
+            <h3 className="text-sm font-medium text-red-400 mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/95 py-2">
+              <span className="w-5 h-5 rounded bg-red-500/20 flex items-center justify-center text-xs">✗</span>
+              Vulnerable Code
+            </h3>
+            <div className="bg-[#1e1e1e] rounded-lg overflow-hidden border border-red-500/30">
+              <div className="p-4 text-xs font-mono leading-relaxed overflow-x-auto">
+                <SyntaxHighlightedCode code={pattern.vulnerable_code} />
+              </div>
+            </div>
+          </div>
+
+          {/* Fixed Code */}
+          <div className="p-4 overflow-y-auto">
+            <h3 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2 sticky top-0 bg-slate-900/95 py-2">
+              <span className="w-5 h-5 rounded bg-green-500/20 flex items-center justify-center text-xs">✓</span>
+              Fixed Code
+            </h3>
+            <div className="bg-[#1e1e1e] rounded-lg overflow-hidden border border-green-500/30">
+              <div className="p-4 text-xs font-mono leading-relaxed overflow-x-auto">
+                <SyntaxHighlightedCode code={pattern.fixed_code} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-700/50 bg-slate-800/30">
+          <div className="text-sm text-slate-400">
+            <strong className="text-white">Key Differences:</strong> The fixed version implements proper security patterns including checks-effects-interactions, access control, and input validation.
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

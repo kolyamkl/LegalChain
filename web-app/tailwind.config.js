@@ -13,12 +13,31 @@ module.exports = {
           DEFAULT: '#030712',
           secondary: '#090e1c',
           card: '#0f172a',
+          light: '#FFFDF8',
+          'light-secondary': '#FAF5EB',
         },
         accent: {
           DEFAULT: '#06b6d4',
           light: '#22d3ee',
           dark: '#0891b2',
           glow: 'rgba(6, 182, 212, 0.3)',
+          // Light theme green accent
+          'light-primary': '#2F543B',
+          'light-secondary': '#228B22',
+        },
+        // Light theme cream colors
+        cream: {
+          50: '#FFFDF8',
+          100: '#FAF5EB',
+          200: '#F5F0E1',
+          300: '#EBE3D1',
+          400: '#DED4C0',
+        },
+        // Warm dark green for light theme
+        forest: {
+          DEFAULT: '#2F543B',
+          light: '#3D6B4D',
+          dark: '#1F3A28',
         },
         risk: {
           low: '#22c55e',

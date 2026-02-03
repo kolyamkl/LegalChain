@@ -10,8 +10,21 @@
   --accent-secondary: 34, 211, 238;
 }
 
+/* Light theme - cream/milk base with warm dark green accent */
+:root.light {
+  --foreground-rgb: 45, 55, 45;
+  --background-start-rgb: 255, 253, 248;
+  --background-end-rgb: 250, 245, 235;
+  --accent-primary: 47, 84, 59;
+  --accent-secondary: 34, 139, 34;
+}
+
 html {
   color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
 }
 
 body {
@@ -23,6 +36,15 @@ body {
       rgb(5, 10, 22) 100%
     );
   min-height: 100vh;
+}
+
+.light body {
+  background: linear-gradient(
+      135deg,
+      rgb(var(--background-start-rgb)) 0%,
+      rgb(var(--background-end-rgb)) 50%,
+      rgb(245, 240, 225) 100%
+    );
 }
 
 @layer utilities {
@@ -55,6 +77,11 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
+.light .glass {
+  background: rgba(255, 253, 248, 0.85);
+  border: 1px solid rgba(47, 84, 59, 0.15);
+}
+
 .glass-card {
   background: linear-gradient(
     135deg,
@@ -63,6 +90,55 @@ body {
   );
   backdrop-filter: blur(16px);
   border: 1px solid rgba(6, 182, 212, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(6, 182, 212, 0.3) 0%,
+    rgba(6, 182, 212, 0.1) 30%,
+    transparent 50%,
+    rgba(6, 182, 212, 0.1) 70%,
+    rgba(6, 182, 212, 0.3) 100%
+  );
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.light .glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 253, 248, 0.95) 0%,
+    rgba(250, 245, 235, 0.9) 100%
+  );
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(47, 84, 59, 0.2);
+  box-shadow: 0 4px 24px rgba(47, 84, 59, 0.08);
+}
+
+.light .glass-card::before {
+  background: linear-gradient(
+    135deg,
+    rgba(47, 84, 59, 0.3) 0%,
+    rgba(47, 84, 59, 0.1) 30%,
+    transparent 50%,
+    rgba(47, 84, 59, 0.1) 70%,
+    rgba(47, 84, 59, 0.3) 100%
+  );
 }
 
 /* Glow effects */
@@ -71,8 +147,17 @@ body {
               0 0 40px rgba(6, 182, 212, 0.1);
 }
 
+.light .glow-cyan {
+  box-shadow: 0 0 20px rgba(47, 84, 59, 0.2),
+              0 0 40px rgba(47, 84, 59, 0.1);
+}
+
 .glow-text {
   text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+}
+
+.light .glow-text {
+  text-shadow: 0 0 20px rgba(47, 84, 59, 0.3);
 }
 
 /* Animated gradient background */
@@ -129,4 +214,118 @@ body {
   );
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
+}
+
+/* Light theme text colors */
+.light .text-white {
+  color: rgb(45, 55, 45);
+}
+
+.light .text-slate-300,
+.light .text-slate-400 {
+  color: rgb(75, 85, 75);
+}
+
+.light .text-slate-500 {
+  color: rgb(100, 110, 100);
+}
+
+/* Light theme backgrounds */
+.light .bg-slate-800\/50,
+.light .bg-slate-800\/60,
+.light .bg-slate-900\/90,
+.light .bg-slate-900\/95 {
+  background-color: rgba(255, 253, 248, 0.95);
+}
+
+.light .border-slate-700\/50,
+.light .border-slate-800\/30 {
+  border-color: rgba(47, 84, 59, 0.15);
+}
+
+/* Light theme accent colors */
+.light .text-accent,
+.light .from-accent,
+.light .to-accent {
+  --tw-text-opacity: 1;
+  color: rgb(47, 84, 59);
+}
+
+.light .bg-accent\/10 {
+  background-color: rgba(47, 84, 59, 0.1);
+}
+
+.light .border-accent\/20,
+.light .border-accent\/30 {
+  border-color: rgba(47, 84, 59, 0.2);
+}
+
+/* Light theme gradients */
+.light .from-cyan-400,
+.light .to-teal-400 {
+  --tw-gradient-from: rgb(47, 84, 59);
+  --tw-gradient-to: rgb(34, 139, 34);
+}
+
+/* Light theme navbar */
+.light nav {
+  background: rgba(255, 253, 248, 0.9);
+  border-color: rgba(47, 84, 59, 0.1);
+}
+
+/* Light theme code blocks keep dark for readability */
+.light .bg-\[#1e1e1e\] {
+  background-color: #1e1e1e;
+}
+
+.light .bg-slate-950 {
+  background-color: #0f172a;
+}
+
+/* Light theme buttons and interactive elements */
+.light .from-accent.to-accent-dark {
+  --tw-gradient-from: #2F543B;
+  --tw-gradient-to: #1F3A28;
+}
+
+.light .shadow-accent\/20,
+.light .shadow-accent\/30,
+.light .shadow-accent\/40 {
+  --tw-shadow-color: rgba(47, 84, 59, 0.2);
+}
+
+/* Light theme hover states */
+.light .hover\:bg-slate-800\/50:hover {
+  background-color: rgba(47, 84, 59, 0.08);
+}
+
+/* Light theme modal and dropdown backgrounds */
+.light .bg-slate-900\/95,
+.light .bg-black\/70 {
+  background-color: rgba(250, 245, 235, 0.97);
+}
+
+.light .bg-black\/70 {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Light theme gradient text */
+.light .bg-gradient-to-r.from-white.via-slate-200.to-slate-400.bg-clip-text {
+  background: linear-gradient(to right, #2F543B, #3D6B4D, #4A7D5C);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Ensure proper contrast for quiz and info sections in light mode */
+.light .bg-red-500\/10,
+.light .bg-red-500\/20 {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+.light .bg-yellow-500\/15 {
+  background-color: rgba(234, 179, 8, 0.15);
+}
+
+.light .bg-green-500\/15 {
+  background-color: rgba(34, 197, 94, 0.15);
 }

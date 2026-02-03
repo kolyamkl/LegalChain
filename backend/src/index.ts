@@ -5,6 +5,7 @@ import analyzeRoutes from './routes/analyze';
 import educationRoutes from './routes/education';
 import authRoutes from './routes/auth';
 import quizRoutes from './routes/quiz';
+import telegramRoutes from './routes/telegram';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use('/api', analyzeRoutes);
 app.use('/api', educationRoutes);
 app.use('/api', authRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api', telegramRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

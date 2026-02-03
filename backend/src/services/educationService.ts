@@ -424,6 +424,532 @@ ERC-20 is the most common token standard on Ethereum, defining a common interfac
     ],
     quiz_correct_index: 2,
   },
+  {
+    id: '6',
+    slug: 'front-running-attack',
+    title: 'Front-Running Attack',
+    category: 'front_running',
+    vulnerable_code: `// VULNERABLE CODE - Front-Running Target
+pragma solidity ^0.8.0;
+
+contract VulnerableDEX {
+    mapping(address => uint256) public tokenBalances;
+    uint256 public tokenPrice = 1 ether;
+    
+    // VULNERABILITY: Price can be front-run
+    function buyTokens() external payable {
+        uint256 tokens = msg.value / tokenPrice;
+        tokenBalances[msg.sender] += tokens;
+    }
+    
+    // VULNERABILITY: Large trades visible in mempool
+    function swapTokens(uint256 amount, uint256 minOutput) external {
+        require(tokenBalances[msg.sender] >= amount);
+        
+        // Attacker sees this tx, buys before, sells after
+        uint256 output = calculateOutput(amount);
+        require(output >= minOutput, "Slippage too high");
+        
+        tokenBalances[msg.sender] -= amount;
+        payable(msg.sender).transfer(output);
+    }
+    
+    function calculateOutput(uint256 amount) internal view returns (uint256) {
+        return amount * tokenPrice / 1e18;
+    }
+}`,
+    fixed_code: `// FIXED CODE - Front-Running Protection
+pragma solidity ^0.8.0;
+
+contract SafeDEX {
+    mapping(address => uint256) public tokenBalances;
+    mapping(bytes32 => bool) public usedCommitments;
+    mapping(address => bytes32) public pendingSwaps;
+    
+    uint256 public constant COMMIT_DELAY = 2; // blocks
+    
+    // Commit-reveal scheme prevents front-running
+    function commitSwap(bytes32 commitment) external {
+        pendingSwaps[msg.sender] = commitment;
+    }
+    
+    function executeSwap(
+        uint256 amount, 
+        uint256 minOutput,
+        bytes32 secret
+    ) external {
+        bytes32 commitment = keccak256(abi.encodePacked(
+            msg.sender, amount, minOutput, secret
+        ));
+        
+        require(pendingSwaps[msg.sender] == commitment, "Invalid commitment");
+        require(!usedCommitments[commitment], "Already used");
+        
+        usedCommitments[commitment] = true;
+        delete pendingSwaps[msg.sender];
+        
+        // Execute swap with slippage protection
+        uint256 output = calculateOutput(amount);
+        require(output >= minOutput, "Slippage exceeded");
+        
+        tokenBalances[msg.sender] -= amount;
+        payable(msg.sender).transfer(output);
+    }
+    
+    function calculateOutput(uint256 amount) internal view returns (uint256) {
+        // Implementation
+        return amount;
+    }
+}`,
+    explanation: `## Front-Running Attacks
+
+Front-running occurs when an attacker observes a pending transaction and submits their own transaction with higher gas to execute first.
+
+### How It Works:
+1. User submits a large swap transaction
+2. Attacker sees it in the mempool
+3. Attacker buys tokens before user's tx (higher gas)
+4. User's tx executes at worse price
+5. Attacker sells immediately after for profit
+
+### Protection Methods:
+1. **Commit-Reveal Schemes**: Hide transaction details until execution
+2. **Slippage Protection**: Set minimum acceptable output
+3. **Private Mempools**: Use Flashbots or similar services
+4. **Batch Auctions**: Process orders in batches at uniform price
+
+### Real Impact:
+MEV (Maximal Extractable Value) from front-running exceeds $1B annually on Ethereum.`,
+    quiz_question: 'What is the best protection against front-running?',
+    quiz_options: [
+      'Using more gas',
+      'Commit-reveal schemes with slippage protection',
+      'Making transactions smaller',
+      'Using older Solidity versions',
+    ],
+    quiz_correct_index: 1,
+  },
+  {
+    id: '7',
+    slug: 'delegatecall-vulnerability',
+    title: 'Delegatecall Vulnerability',
+    category: 'delegatecall',
+    vulnerable_code: `// VULNERABLE CODE - Unsafe Delegatecall
+pragma solidity ^0.8.0;
+
+contract VulnerableProxy {
+    address public implementation;
+    address public owner;
+    
+    constructor(address _impl) {
+        implementation = _impl;
+        owner = msg.sender;
+    }
+    
+    // VULNERABILITY: Anyone can call any function
+    fallback() external payable {
+        (bool success, ) = implementation.delegatecall(msg.data);
+        require(success, "Delegatecall failed");
+    }
+    
+    // VULNERABILITY: No storage collision protection
+    function upgrade(address newImpl) external {
+        require(msg.sender == owner, "Not owner");
+        implementation = newImpl;
+    }
+}
+
+contract MaliciousImplementation {
+    // Storage slot 0 - will overwrite 'implementation'
+    address public maliciousAddr;
+    // Storage slot 1 - will overwrite 'owner'  
+    address public newOwner;
+    
+    function attack() external {
+        // This overwrites proxy's storage!
+        newOwner = msg.sender;
+    }
+}`,
+    fixed_code: `// FIXED CODE - Safe Proxy Pattern
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+
+// Use OpenZeppelin's battle-tested proxy
+contract SafeProxy is ERC1967Proxy {
+    constructor(
+        address _logic,
+        bytes memory _data
+    ) ERC1967Proxy(_logic, _data) {}
+}
+
+// Implementation with proper storage layout
+contract SafeImplementation is UUPSUpgradeable {
+    // Use storage gaps to prevent collisions
+    uint256[50] private __gap;
+    
+    address public owner;
+    uint256 public value;
+    
+    function initialize(address _owner) external {
+        require(owner == address(0), "Already initialized");
+        owner = _owner;
+    }
+    
+    function _authorizeUpgrade(address) internal override {
+        require(msg.sender == owner, "Not owner");
+    }
+}`,
+    explanation: `## Delegatecall Vulnerabilities
+
+Delegatecall executes code from another contract in the context of the calling contract, using the caller's storage.
+
+### Dangers:
+1. **Storage Collision**: Called contract can overwrite critical storage
+2. **Context Confusion**: msg.sender and msg.value are preserved
+3. **Upgrade Attacks**: Malicious upgrades can steal funds
+
+### Storage Layout:
+\`\`\`
+Proxy Storage:        Implementation Storage:
+Slot 0: implementation    Slot 0: someVar (COLLISION!)
+Slot 1: owner            Slot 1: anotherVar (COLLISION!)
+\`\`\`
+
+### Safe Patterns:
+1. Use ERC-1967 standard storage slots
+2. Use OpenZeppelin's proxy contracts
+3. Implement storage gaps for upgrades
+4. Always audit implementation contracts`,
+    quiz_question: 'What is the main risk with delegatecall?',
+    quiz_options: [
+      'It uses too much gas',
+      'Storage collision with the calling contract',
+      'It cannot return values',
+      'It only works with ETH transfers',
+    ],
+    quiz_correct_index: 1,
+  },
+  {
+    id: '8',
+    slug: 'timestamp-dependence',
+    title: 'Timestamp Dependence',
+    category: 'timestamp',
+    vulnerable_code: `// VULNERABLE CODE - Timestamp Manipulation
+pragma solidity ^0.8.0;
+
+contract VulnerableLottery {
+    uint256 public jackpot;
+    uint256 public lastPlayTime;
+    
+    function play() external payable {
+        require(msg.value >= 0.1 ether, "Min bet 0.1 ETH");
+        jackpot += msg.value;
+        
+        // VULNERABILITY: Miner can manipulate timestamp
+        if (block.timestamp % 15 == 0) {
+            payable(msg.sender).transfer(jackpot);
+            jackpot = 0;
+        }
+    }
+    
+    // VULNERABILITY: Predictable "randomness"
+    function getRandomNumber() public view returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            block.difficulty,
+            msg.sender
+        )));
+    }
+    
+    // VULNERABILITY: Time-based unlock
+    function withdrawAfterDelay() external {
+        require(block.timestamp > lastPlayTime + 1 hours);
+        // Miner can set timestamp to bypass this
+    }
+}`,
+    fixed_code: `// FIXED CODE - Secure Randomness
+pragma solidity ^0.8.0;
+
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
+
+contract SafeLottery is VRFConsumerBase {
+    bytes32 internal keyHash;
+    uint256 internal fee;
+    uint256 public randomResult;
+    
+    mapping(bytes32 => address) public requestToPlayer;
+    
+    constructor() VRFConsumerBase(
+        0x... , // VRF Coordinator
+        0x...   // LINK Token
+    ) {
+        keyHash = 0x...;
+        fee = 0.1 * 10**18;
+    }
+    
+    function play() external payable returns (bytes32) {
+        require(msg.value >= 0.1 ether);
+        require(LINK.balanceOf(address(this)) >= fee);
+        
+        // Request randomness from Chainlink VRF
+        bytes32 requestId = requestRandomness(keyHash, fee);
+        requestToPlayer[requestId] = msg.sender;
+        return requestId;
+    }
+    
+    function fulfillRandomness(
+        bytes32 requestId, 
+        uint256 randomness
+    ) internal override {
+        address player = requestToPlayer[requestId];
+        
+        // True randomness - cannot be manipulated
+        if (randomness % 100 < 10) { // 10% win chance
+            payable(player).transfer(address(this).balance);
+        }
+    }
+}`,
+    explanation: `## Timestamp Dependence
+
+Block timestamps can be slightly manipulated by miners (within ~15 seconds), making them unsuitable for critical logic.
+
+### Vulnerable Uses:
+1. **Randomness**: Using timestamp as random seed
+2. **Time locks**: Short duration time-based locks
+3. **Lottery/Gaming**: Determining winners
+4. **Auctions**: Ending times
+
+### Miner Manipulation:
+- Miners can adjust timestamp within ~15 seconds
+- They can choose not to include transactions
+- They can reorder transactions
+
+### Safe Alternatives:
+1. **Chainlink VRF**: Verifiable random function
+2. **Commit-Reveal**: For randomness
+3. **Block numbers**: For longer time periods
+4. **External oracles**: For time-sensitive data`,
+    quiz_question: 'Why is block.timestamp unsafe for randomness?',
+    quiz_options: [
+      'It changes too fast',
+      'Miners can manipulate it within ~15 seconds',
+      'It is always zero',
+      'It uses too much gas',
+    ],
+    quiz_correct_index: 1,
+  },
+  {
+    id: '9',
+    slug: 'unchecked-return-value',
+    title: 'Unchecked Return Values',
+    category: 'unchecked_return',
+    vulnerable_code: `// VULNERABLE CODE - Unchecked Returns
+pragma solidity ^0.8.0;
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+contract VulnerableVault {
+    IERC20 public token;
+    mapping(address => uint256) public deposits;
+    
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+    
+    function deposit(uint256 amount) external {
+        // VULNERABILITY: Return value not checked!
+        // Some tokens return false instead of reverting
+        token.transferFrom(msg.sender, address(this), amount);
+        deposits[msg.sender] += amount;
+    }
+    
+    function withdraw(uint256 amount) external {
+        require(deposits[msg.sender] >= amount);
+        deposits[msg.sender] -= amount;
+        
+        // VULNERABILITY: If transfer fails silently, 
+        // user loses their deposit record but keeps tokens
+        token.transfer(msg.sender, amount);
+    }
+}`,
+    fixed_code: `// FIXED CODE - Safe Token Transfers
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract SafeVault {
+    using SafeERC20 for IERC20;
+    
+    IERC20 public token;
+    mapping(address => uint256) public deposits;
+    
+    constructor(address _token) {
+        token = IERC20(_token);
+    }
+    
+    function deposit(uint256 amount) external {
+        // SafeERC20 reverts if transfer fails
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        deposits[msg.sender] += amount;
+    }
+    
+    function withdraw(uint256 amount) external {
+        require(deposits[msg.sender] >= amount, "Insufficient");
+        deposits[msg.sender] -= amount;
+        
+        // Safe transfer - reverts on failure
+        token.safeTransfer(msg.sender, amount);
+    }
+}`,
+    explanation: `## Unchecked Return Values
+
+Some ERC-20 tokens don't revert on failure - they return false instead. Not checking this can lead to serious bugs.
+
+### Problem Tokens:
+- **USDT**: Doesn't return a value at all
+- **BNB**: Returns false on failure
+- **Some tokens**: Have non-standard implementations
+
+### Consequences:
+1. Silent failures in deposits
+2. Accounting mismatches
+3. Loss of funds
+4. Exploitable state inconsistencies
+
+### Solution - SafeERC20:
+OpenZeppelin's SafeERC20 library:
+- Checks return values
+- Handles tokens with no return value
+- Reverts on any failure
+- Works with all ERC-20 variants`,
+    quiz_question: 'Why should you use SafeERC20 for token transfers?',
+    quiz_options: [
+      'It is faster',
+      'Some tokens return false instead of reverting on failure',
+      'It uses less gas',
+      'It is required by the ERC-20 standard',
+    ],
+    quiz_correct_index: 1,
+  },
+  {
+    id: '10',
+    slug: 'denial-of-service',
+    title: 'Denial of Service (DoS)',
+    category: 'dos',
+    vulnerable_code: `// VULNERABLE CODE - DoS Vulnerabilities
+pragma solidity ^0.8.0;
+
+contract VulnerableAuction {
+    address public highestBidder;
+    uint256 public highestBid;
+    
+    // VULNERABILITY: Refund can fail, blocking new bids
+    function bid() external payable {
+        require(msg.value > highestBid, "Bid too low");
+        
+        // If this transfer fails, no one can bid anymore!
+        if (highestBidder != address(0)) {
+            payable(highestBidder).transfer(highestBid);
+        }
+        
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+    }
+}
+
+contract VulnerableDistributor {
+    address[] public recipients;
+    
+    // VULNERABILITY: Unbounded loop can run out of gas
+    function distribute() external payable {
+        uint256 share = msg.value / recipients.length;
+        
+        // If array is too large, this will always fail
+        for (uint i = 0; i < recipients.length; i++) {
+            payable(recipients[i]).transfer(share);
+        }
+    }
+}`,
+    fixed_code: `// FIXED CODE - DoS Resistant
+pragma solidity ^0.8.0;
+
+contract SafeAuction {
+    address public highestBidder;
+    uint256 public highestBid;
+    mapping(address => uint256) public pendingReturns;
+    
+    function bid() external payable {
+        require(msg.value > highestBid, "Bid too low");
+        
+        // Store refund for later withdrawal (pull pattern)
+        if (highestBidder != address(0)) {
+            pendingReturns[highestBidder] += highestBid;
+        }
+        
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+    }
+    
+    // Users withdraw their own refunds
+    function withdraw() external {
+        uint256 amount = pendingReturns[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        
+        pendingReturns[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+    }
+}
+
+contract SafeDistributor {
+    mapping(address => uint256) public shares;
+    
+    function setShare(address recipient, uint256 amount) external {
+        shares[recipient] = amount;
+    }
+    
+    // Pull pattern - users claim their own shares
+    function claim() external {
+        uint256 amount = shares[msg.sender];
+        require(amount > 0, "No shares");
+        
+        shares[msg.sender] = 0;
+        payable(msg.sender).transfer(amount);
+    }
+}`,
+    explanation: `## Denial of Service Attacks
+
+DoS attacks prevent legitimate users from using a contract by exploiting design flaws.
+
+### Common DoS Vectors:
+1. **Failed External Calls**: Contract that always reverts
+2. **Gas Limits**: Unbounded loops exceeding block gas limit
+3. **Unexpected Reverts**: Malicious contracts in arrays
+4. **Block Stuffing**: Filling blocks to prevent transactions
+
+### The Pull vs Push Pattern:
+- **Push (Vulnerable)**: Contract sends funds to users
+- **Pull (Safe)**: Users withdraw their own funds
+
+### Prevention:
+1. Use pull over push for payments
+2. Limit loop iterations
+3. Handle failed transfers gracefully
+4. Set reasonable gas limits for external calls`,
+    quiz_question: 'What is the safest pattern for distributing funds?',
+    quiz_options: [
+      'Push pattern - send to all users in a loop',
+      'Pull pattern - let users withdraw themselves',
+      'Send all funds to one address',
+      'Use delegatecall for transfers',
+    ],
+    quiz_correct_index: 1,
+  },
 ];
 
 export function getAllPatterns(): EducationPatternSummary[] {

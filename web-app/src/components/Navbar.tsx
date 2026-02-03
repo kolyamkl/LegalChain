@@ -2,17 +2,35 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, BookOpen, LogIn, LogOut, User, FileText, Bell, Settings, LayoutDashboard } from 'lucide-react';
+import { Shield, BookOpen, LogIn, LogOut, User, FileText, Bell, Settings, LayoutDashboard, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from './AuthProvider';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme') as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle('light', savedTheme === 'light');
+    }
+  }, []);
+
+  const toggleTheme = (newTheme: 'dark' | 'light') => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('light', newTheme === 'light');
+    setShowSettingsMenu(false);
+  };
 
   const isSecurityMode = pathname.startsWith('/security');
   const isEducationMode = pathname.startsWith('/education');
@@ -142,6 +160,62 @@ export function Navbar() {
               >
                 <Bell className="w-5 h-5" />
               </motion.button>
+              
+              {/* Settings Button with Theme Toggle */}
+              <div className="relative">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onMouseEnter={() => setShowSettingsMenu(true)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                  title="Settings"
+                >
+                  <Settings className="w-5 h-5" />
+                </motion.button>
+                
+                <AnimatePresence>
+                  {showSettingsMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      onMouseEnter={() => setShowSettingsMenu(true)}
+                      onMouseLeave={() => setShowSettingsMenu(false)}
+                      className="absolute right-0 top-full mt-2 w-48 py-2 bg-slate-900/95 backdrop-blur-xl rounded-xl border border-slate-700/50 shadow-xl"
+                    >
+                      <div className="px-4 py-2 border-b border-slate-700/50">
+                        <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Theme</p>
+                      </div>
+                      <button
+                        onClick={() => toggleTheme('dark')}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors",
+                          theme === 'dark' 
+                            ? "text-accent bg-accent/10" 
+                            : "text-slate-300 hover:bg-slate-800/50"
+                        )}
+                      >
+                        <Moon className="w-4 h-4" />
+                        Dark Mode
+                        {theme === 'dark' && <span className="ml-auto text-accent">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => toggleTheme('light')}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors",
+                          theme === 'light' 
+                            ? "text-accent bg-accent/10" 
+                            : "text-slate-300 hover:bg-slate-800/50"
+                        )}
+                      >
+                        <Sun className="w-4 h-4" />
+                        Light Mode
+                        {theme === 'light' && <span className="ml-auto text-accent">✓</span>}
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {isLoading ? (
