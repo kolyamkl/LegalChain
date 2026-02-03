@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ContractAnalysis {
+  id               String   @id @default(uuid())
+  chainId          Int      @map("chain_id")
+  contractAddress  String?  @map("contract_address")
+  txHash           String?  @map("tx_hash")
+  sourceCode       String?  @map("source_code") @db.Text
+  abi              Json?
+  compilerVersion  String?  @map("compiler_version")
+
+  riskScore        Int      @map("risk_score")
+  riskLevel        String   @map("risk_level")
+  confidence       Float?
+
+  summaryShort     String   @map("summary_short") @db.Text
+  keyFindings      Json     @map("key_findings")
+
+  oracleData       Json?    @map("oracle_data")
+  historyData      Json?    @map("history_data")
+
+  voiceAssetUrl    String?  @map("voice_asset_url")
+  analysisVersion  String   @map("analysis_version") @default("1.0.0")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  vulnerabilityFindings VulnerabilityFinding[]
+
+  @@map("contract_analyses")
+  @@index([chainId, contractAddress])
+}
+
+model VulnerabilityFinding {
+  id                  String   @id @default(uuid())
+  contractAnalysisId  String   @map("contract_analysis_id")
+  
+  lineStart           Int?     @map("line_start")
+  lineEnd             Int?     @map("line_end")
+  codeSnippet         String?  @map("code_snippet") @db.Text
+
+  title               String
+  description         String   @db.Text
+  severity            String
+  category            String
+
+  fixSuggestion       String?  @map("fix_suggestion") @db.Text
+  educationLink       String?  @map("education_link")
+
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  contractAnalysis    ContractAnalysis @relation(fields: [contractAnalysisId], references: [id], onDelete: Cascade)
+
+  @@map("vulnerability_findings")
+}
+
+model EducationPattern {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  title           String
+  category        String
+
+  vulnerableCode  String   @map("vulnerable_code") @db.Text
+  fixedCode       String   @map("fixed_code") @db.Text
+  explanation     String   @db.Text
+
+  quizQuestion    String   @map("quiz_question")
+  quizOptions     Json     @map("quiz_options")
+  quizCorrectIndex Int     @map("quiz_correct_index")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("education_patterns")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  name          String?
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

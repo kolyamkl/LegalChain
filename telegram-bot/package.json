@@ -1,0 +1,21 @@
+{
+  "name": "legalchain-telegram-bot",
+  "version": "1.0.0",
+  "description": "LegalChain Telegram Bot - Quick contract security checks",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-telegram-bot-api": "^0.64.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/node-telegram-bot-api": "^0.64.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

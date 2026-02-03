@@ -1,0 +1,171 @@
+#legalchain-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#legalchain-widget.legalchain-hidden {
+  display: none;
+}
+
+.legalchain-widget-content {
+  width: 280px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.legalchain-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  color: white;
+}
+
+.legalchain-logo {
+  font-size: 18px;
+}
+
+.legalchain-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.legalchain-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.legalchain-close:hover {
+  opacity: 1;
+}
+
+.legalchain-body {
+  padding: 16px;
+}
+
+.legalchain-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.legalchain-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: legalchain-spin 1s linear infinite;
+}
+
+@keyframes legalchain-spin {
+  to { transform: rotate(360deg); }
+}
+
+.legalchain-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.legalchain-score {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 3px solid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+
+.legalchain-score-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.legalchain-score-label {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.legalchain-risk-level {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.legalchain-summary {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.legalchain-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.legalchain-link:hover {
+  text-decoration: underline;
+}
+
+.legalchain-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 10px;
+}
+
+.legalchain-error-icon {
+  font-size: 24px;
+}
+
+.legalchain-error p {
+  font-size: 12px;
+  color: #dc2626;
+  margin: 0;
+}
+
+.legalchain-retry {
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #475569;
+}
+
+.legalchain-retry:hover {
+  background: #e2e8f0;
+}

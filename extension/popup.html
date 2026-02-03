@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LegalChain</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <span class="logo-text">LegalChain</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <div id="input-section" class="section">
+        <label for="address-input" class="label">Contract Address</label>
+        <input 
+          type="text" 
+          id="address-input" 
+          class="input" 
+          placeholder="0x..."
+        >
+        <button id="scan-btn" class="btn btn-primary">
+          <span class="btn-icon">🔍</span>
+          Scan Contract
+        </button>
+      </div>
+
+      <div id="loading-section" class="section hidden">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Analyzing contract...</p>
+        </div>
+      </div>
+
+      <div id="result-section" class="section hidden">
+        <div class="risk-score">
+          <div class="score-circle" id="score-circle">
+            <span class="score-value" id="score-value">0</span>
+            <span class="score-label">/100</span>
+          </div>
+          <div class="risk-level" id="risk-level">Low Risk</div>
+        </div>
+
+        <div class="summary" id="summary">
+          <!-- Summary will be inserted here -->
+        </div>
+
+        <div class="findings">
+          <h3 class="findings-title">Key Findings</h3>
+          <ul class="findings-list" id="findings-list">
+            <!-- Findings will be inserted here -->
+          </ul>
+        </div>
+
+        <div class="actions">
+          <button id="full-analysis-btn" class="btn btn-secondary">
+            📊 Full Analysis
+          </button>
+          <button id="scan-again-btn" class="btn btn-outline">
+            🔄 Scan Again
+          </button>
+        </div>
+      </div>
+
+      <div id="error-section" class="section hidden">
+        <div class="error">
+          <div class="error-icon">❌</div>
+          <p class="error-message" id="error-message">An error occurred</p>
+          <button id="retry-btn" class="btn btn-outline">Try Again</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <a href="#" id="webapp-link" class="footer-link">Open Web App</a>
+      <span class="footer-divider">•</span>
+      <a href="#" id="education-link" class="footer-link">Learn Security</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
