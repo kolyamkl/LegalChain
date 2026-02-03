@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, BookOpen, LogIn, LogOut, User } from 'lucide-react';
+import { Shield, BookOpen, LogIn, LogOut, User, FileText, Bell, Settings, LayoutDashboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuth } from './AuthProvider';
@@ -14,75 +14,136 @@ export function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
+  const isSecurityMode = pathname.startsWith('/security');
   const isEducationMode = pathname.startsWith('/education');
-
-  const handleToggle = () => {
-    if (isEducationMode) {
-      router.push('/');
-    } else {
-      router.push('/education');
-    }
-  };
 
   return (
     <motion.nav 
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      className="glass sticky top-0 z-50 border-b border-slate-800/50"
+      className="sticky top-0 z-50 bg-transparent backdrop-blur-md border-b border-slate-800/30"
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <motion.div 
-              whileHover={{ scale: 1.05, rotate: 5 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="w-10 h-10 bg-gradient-to-br from-accent to-accent-light rounded-xl flex items-center justify-center shadow-lg shadow-accent/20"
+              className="relative w-10 h-10"
             >
-              <Shield className="w-5 h-5 text-white" />
+              {/* Hexagon Logo */}
+              <svg viewBox="0 0 40 40" className="w-full h-full">
+                <defs>
+                  <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#22d3ee" />
+                    <stop offset="100%" stopColor="#0891b2" />
+                  </linearGradient>
+                </defs>
+                <path 
+                  d="M20 2 L36 11 L36 29 L20 38 L4 29 L4 11 Z" 
+                  fill="url(#logoGradient)" 
+                  className="drop-shadow-lg"
+                />
+                <path 
+                  d="M20 8 L14 12 L14 20 L20 24 L26 20 L26 12 Z" 
+                  fill="none" 
+                  stroke="white" 
+                  strokeWidth="1.5"
+                  className="opacity-90"
+                />
+                <circle cx="20" cy="16" r="3" fill="white" className="opacity-90" />
+              </svg>
             </motion.div>
-            <span className="text-xl font-bold bg-gradient-to-r from-accent to-accent-light bg-clip-text text-transparent group-hover:opacity-80 transition-opacity">
+            <span className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent group-hover:opacity-80 transition-opacity">
               LegalChain
             </span>
           </Link>
 
-          {/* Center Toggle Switch */}
+          {/* Center Toggle Switch with Tubelight Effect */}
           <div className="absolute left-1/2 -translate-x-1/2">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 bg-slate-900/80 p-1 rounded-full border border-slate-700/50"
-            >
+            <div className="relative flex items-center bg-slate-900/90 p-1 rounded-full border border-slate-700/50 backdrop-blur-lg">
+              {/* Animated Background Pill */}
+              <motion.div
+                className="absolute h-[calc(100%-8px)] top-1 rounded-full bg-gradient-to-r from-accent to-cyan-500 shadow-lg shadow-accent/40"
+                initial={false}
+                animate={{
+                  x: isEducationMode ? 'calc(100% + 4px)' : 4,
+                  width: isEducationMode ? 'calc(50% - 6px)' : 'calc(50% - 6px)',
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 400,
+                  damping: 30,
+                }}
+              >
+                {/* Tubelight Glow Effect */}
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-accent rounded-full opacity-80" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-12 h-4 bg-accent/30 rounded-full blur-md" />
+              </motion.div>
+
+              {/* Security Button */}
               <button
-                onClick={() => !isEducationMode && handleToggle()}
+                onClick={() => router.push('/security')}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300',
-                  !isEducationMode
-                    ? 'bg-gradient-to-r from-accent to-accent-dark text-white shadow-lg shadow-accent/30'
-                    : 'text-slate-400 hover:text-white'
+                  'relative z-10 flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors duration-200',
+                  isSecurityMode || (!isEducationMode && !isSecurityMode)
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
                 )}
               >
                 <Shield className="w-4 h-4" />
                 <span className="hidden sm:inline">Security</span>
               </button>
               
+              {/* Education Button */}
               <button
-                onClick={() => isEducationMode && handleToggle()}
+                onClick={() => router.push('/education')}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300',
+                  'relative z-10 flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors duration-200',
                   isEducationMode
-                    ? 'bg-gradient-to-r from-accent to-accent-dark text-white shadow-lg shadow-accent/30'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
                 )}
               >
                 <BookOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">Education</span>
               </button>
-            </motion.div>
+            </div>
           </div>
 
-          {/* Right Side - Auth */}
-          <div className="flex items-center gap-3">
+          {/* Right Side - Nav Items & Auth */}
+          <div className="flex items-center gap-2">
+            {/* Additional Nav Buttons */}
+            <div className="hidden md:flex items-center gap-1 mr-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/dashboard')}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-accent/20 to-cyan-500/20 border border-accent/30 text-accent hover:from-accent/30 hover:to-cyan-500/30 transition-all"
+                title="Dashboard"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="text-sm font-medium">Dashboard</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                title="Documentation"
+              >
+                <FileText className="w-5 h-5" />
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+              </motion.button>
+            </div>
+
             {isLoading ? (
               <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse" />
             ) : isAuthenticated ? (
@@ -91,7 +152,7 @@ export function Navbar() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-800/80 border border-slate-700/50 hover:border-accent/50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-800/60 border border-slate-700/50 hover:border-accent/50 transition-colors"
                 >
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-accent-light flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
@@ -117,7 +178,7 @@ export function Navbar() {
                         onClick={() => {
                           logout();
                           setShowUserMenu(false);
-                          router.push('/login');
+                          router.push('/');
                         }}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800/50 hover:text-red-400 transition-colors"
                       >
@@ -134,7 +195,7 @@ export function Navbar() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Link
-                  href="/login"
+                  href="/"
                   className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-accent to-accent-dark text-white text-sm font-medium shadow-lg shadow-accent/20 hover:shadow-accent/40 transition-shadow"
                 >
                   <LogIn className="w-4 h-4" />

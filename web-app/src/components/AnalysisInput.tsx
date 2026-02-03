@@ -13,23 +13,35 @@ interface AnalysisInputProps {
 }
 
 const INPUT_TYPES = [
-  { value: 'auto', label: 'Auto-detect' },
-  { value: 'address', label: 'Address' },
-  { value: 'tx_hash', label: 'Tx Hash' },
-  { value: 'source_code', label: 'Source Code' },
+  { value: 'auto', label: 'Auto-detect', placeholder: 'Paste contract address, transaction hash, or Solidity code...' },
+  { value: 'address', label: 'Contract Address', placeholder: '0x1234...abcd (Contract address)' },
+  { value: 'tx_hash', label: 'Transaction Hash', placeholder: '0xabc123...def456 (Transaction hash)' },
+  { value: 'source_code', label: 'Source Code', placeholder: 'Paste Solidity source code here...' },
 ] as const;
 
+const EthereumLogo = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+    <path d="M12 1.5L5.5 12.5L12 16.5L18.5 12.5L12 1.5Z" fill="#627EEA"/>
+    <path d="M12 1.5V16.5L18.5 12.5L12 1.5Z" fill="#627EEA" fillOpacity="0.8"/>
+    <path d="M12 17.5L5.5 13.5L12 22.5L18.5 13.5L12 17.5Z" fill="#627EEA"/>
+    <path d="M12 17.5V22.5L18.5 13.5L12 17.5Z" fill="#627EEA" fillOpacity="0.8"/>
+    <path d="M12 9L5.5 12.5L12 16.5L18.5 12.5L12 9Z" fill="white" fillOpacity="0.3"/>
+  </svg>
+);
+
 const CHAINS = [
-  { id: 1, name: 'Ethereum', icon: '⟠' },
+  { id: 1, name: 'Ethereum', icon: <EthereumLogo /> },
 ] as const;
 
 export function AnalysisInput({ onAnalyze, isLoading }: AnalysisInputProps) {
   const [value, setValue] = useState('');
   const [inputType, setInputType] = useState<'auto' | InputType>('auto');
   const [chainId, setChainId] = useState(1);
-  const [generateVoice, setGenerateVoice] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [showChainDropdown, setShowChainDropdown] = useState(false);
+
+  const currentInputType = INPUT_TYPES.find((t) => t.value === inputType);
+  const currentPlaceholder = currentInputType?.placeholder || INPUT_TYPES[0].placeholder;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +59,7 @@ export function AnalysisInput({ onAnalyze, isLoading }: AnalysisInputProps) {
       resolvedType = inputType;
     }
 
-    onAnalyze(resolvedType, value.trim(), generateVoice);
+    onAnalyze(resolvedType, value.trim(), true);
   };
 
   const isSourceCode = inputType === 'source_code' || 
@@ -101,8 +113,8 @@ export function AnalysisInput({ onAnalyze, isLoading }: AnalysisInputProps) {
               onClick={() => setShowChainDropdown(!showChainDropdown)}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-sm font-medium hover:bg-slate-700/80 hover:border-accent/30 transition-all"
             >
-              {CHAINS.find((c) => c.id === chainId)?.icon}
-              {CHAINS.find((c) => c.id === chainId)?.name}
+              <EthereumLogo />
+              <span>Ethereum</span>
               <ChevronDown className="w-4 h-4 text-slate-400" />
             </button>
             <AnimatePresence>
@@ -111,39 +123,27 @@ export function AnalysisInput({ onAnalyze, isLoading }: AnalysisInputProps) {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-xl z-10 min-w-[140px] overflow-hidden"
+                  className="absolute top-full left-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-xl z-10 min-w-[160px] overflow-hidden"
                 >
-                  {CHAINS.map((chain) => (
-                    <button
-                      key={chain.id}
-                      type="button"
-                      onClick={() => {
-                        setChainId(chain.id);
-                        setShowChainDropdown(false);
-                      }}
-                      className={cn(
-                        'w-full px-4 py-2.5 text-left text-sm hover:bg-slate-800 transition-colors flex items-center gap-2',
-                        chainId === chain.id && 'bg-accent/10 text-accent'
-                      )}
-                    >
-                      <span>{chain.icon}</span>
-                      {chain.name}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChainId(1);
+                      setShowChainDropdown(false);
+                    }}
+                    className={cn(
+                      'w-full px-4 py-2.5 text-left text-sm hover:bg-slate-800 transition-colors flex items-center gap-2',
+                      chainId === 1 && 'bg-accent/10 text-accent'
+                    )}
+                  >
+                    <EthereumLogo />
+                    Ethereum
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-sm cursor-pointer hover:bg-slate-700/80 hover:border-accent/30 transition-all">
-            <input
-              type="checkbox"
-              checked={generateVoice}
-              onChange={(e) => setGenerateVoice(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-accent focus:ring-accent"
-            />
-            <span className="text-slate-300">🔊 Voice</span>
-          </label>
         </div>
 
         {isSourceCode ? (
@@ -159,7 +159,7 @@ export function AnalysisInput({ onAnalyze, isLoading }: AnalysisInputProps) {
               type="text"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="Paste contract address, transaction hash, or Solidity code..."
+              placeholder={currentPlaceholder}
               className="w-full px-4 py-4 pr-12 bg-slate-900/50 border border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50 placeholder-slate-500 transition-all"
             />
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-accent transition-colors" />

@@ -90,5 +90,26 @@ model User {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  quizResults   QuizResult[]
+  
   @@map("users")
+}
+
+model QuizResult {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  patternSlug     String   @map("pattern_slug")
+  
+  score           Int      // Percentage score (0-100)
+  totalQuestions  Int      @map("total_questions")
+  correctAnswers  Int      @map("correct_answers")
+  answers         Json     // Array of {questionIndex, selectedAnswer, isCorrect}
+  
+  passed          Boolean  @default(false) // true if score >= 70
+  completedAt     DateTime @default(now()) @map("completed_at")
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, patternSlug])
+  @@map("quiz_results")
 }

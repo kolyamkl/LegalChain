@@ -59,41 +59,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Login failed');
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      Cookies.set('token', data.token, { expires: 7 });
+      setUser(data.user);
+    } catch (err) {
+      console.error('Login error:', err);
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        throw new Error('Cannot connect to server. Please ensure the backend is running.');
+      }
+      throw err;
     }
-
-    Cookies.set('token', data.token, { expires: 7 });
-    setUser(data.user);
   };
 
   const register = async (email: string, password: string, name?: string) => {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password, name }),
-    });
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Registration failed');
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      Cookies.set('token', data.token, { expires: 7 });
+      setUser(data.user);
+    } catch (err) {
+      console.error('Registration error:', err);
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        throw new Error('Cannot connect to server. Please ensure the backend is running.');
+      }
+      throw err;
     }
-
-    Cookies.set('token', data.token, { expires: 7 });
-    setUser(data.user);
   };
 
   const logout = () => {

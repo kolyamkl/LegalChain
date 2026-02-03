@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import analyzeRoutes from './routes/analyze';
 import educationRoutes from './routes/education';
 import authRoutes from './routes/auth';
+import quizRoutes from './routes/quiz';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
+  origin: true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -19,6 +20,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api', analyzeRoutes);
 app.use('/api', educationRoutes);
 app.use('/api', authRoutes);
+app.use('/api/quiz', quizRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
