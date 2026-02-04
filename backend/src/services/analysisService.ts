@@ -109,9 +109,9 @@ export async function analyzeContract(
       riskLevel,
       confidence: 0.85,
       summaryShort: llmResult.summary_short,
-      keyFindings: llmResult.key_findings,
-      oracleData,
-      historyData,
+      keyFindings: llmResult.key_findings as any,
+      oracleData: oracleData as any,
+      historyData: historyData as any,
       voiceAssetUrl,
       analysisVersion: '1.0.0',
       vulnerabilityFindings: {
@@ -134,6 +134,11 @@ export async function analyzeContract(
     },
   });
 
+  // Type assertion for the query result
+  type AnalysisWithFindings = typeof savedAnalysis & {
+    vulnerabilityFindings: typeof savedAnalysis.vulnerabilityFindings;
+  };
+  
   return {
     analysis_id: savedAnalysis.id,
     risk_score: savedAnalysis.riskScore,
@@ -141,7 +146,7 @@ export async function analyzeContract(
     summary_short: savedAnalysis.summaryShort,
     key_findings: savedAnalysis.keyFindings as any,
     oracle_data: savedAnalysis.oracleData as any,
-    vulnerabilities: savedAnalysis.vulnerabilityFindings.map((v) => ({
+    vulnerabilities: (savedAnalysis as AnalysisWithFindings).vulnerabilityFindings.map((v: any) => ({
       id: v.id,
       line_start: v.lineStart,
       line_end: v.lineEnd,

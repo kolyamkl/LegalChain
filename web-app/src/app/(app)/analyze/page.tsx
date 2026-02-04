@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnalysisTabs } from '@/components/AnalysisTabs';
 import { getAnalysisById } from '@/lib/api';
 import type { ContractAnalysis } from '@/types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
-export default function AnalyzePage() {
+function AnalyzeContent() {
   const searchParams = useSearchParams();
   const analysisId = searchParams.get('analysis_id');
   
@@ -104,5 +104,18 @@ export default function AnalyzePage() {
 
       <AnalysisTabs analysis={analysis} />
     </div>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+      </div>
+    }>
+      <AnalyzeContent />
+    </Suspense>
   );
 }

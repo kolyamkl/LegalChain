@@ -836,7 +836,7 @@ function QuizModal({ pattern, onClose }: { pattern: EducationPattern; onClose: (
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
-    const correctCount = answers.reduce((count, answer, index) => {
+    const correctCount: number = answers.reduce((count: number, answer, index) => {
       return count + (answer === questions[index].correctIndex ? 1 : 0);
     }, 0);
 
@@ -870,7 +870,7 @@ function QuizModal({ pattern, onClose }: { pattern: EducationPattern; onClose: (
     setShowResults(true);
   };
 
-  const score = answers.reduce((count, answer, index) => {
+  const score: number = answers.reduce((count: number, answer, index) => {
     return count + (answer === questions[index].correctIndex ? 1 : 0);
   }, 0);
   const percentage = Math.round((score / questions.length) * 100);

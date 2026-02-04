@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:3001';
+const API_URL = 'http://localhost:3002';
 const WEB_APP_URL = 'http://localhost:3000';
 
 const analysisCache = new Map();

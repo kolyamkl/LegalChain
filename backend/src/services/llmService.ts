@@ -1,5 +1,10 @@
 import { KeyFinding, UserLevel, Severity, OracleData } from '../models/types';
 import { DetectedVulnerability } from './staticAnalysis';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export interface LLMAnalysisResult {
   summary_short: string;
@@ -15,6 +20,125 @@ export interface LLMServiceInterface {
   ): Promise<LLMAnalysisResult>;
 }
 
+// Real OpenAI LLM Service
+export class OpenAILLMService implements LLMServiceInterface {
+  async analyzeFindingsWithLLM(
+    technicalFindings: DetectedVulnerability[],
+    oracleData: OracleData | null,
+    userLevel: UserLevel
+  ): Promise<LLMAnalysisResult> {
+    try {
+      const prompt = this.buildPrompt(technicalFindings, oracleData, userLevel);
+      
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a smart contract security expert. Analyze the provided security findings and explain them clearly.
+            
+Your response MUST be a valid JSON object with this exact structure:
+{
+  "summary_short": "A 1-2 sentence summary of the overall risk level",
+  "key_findings": [
+    {
+      "title": "Finding title",
+      "severity": "critical|high|medium|low",
+      "description": "Clear explanation of the issue"
+    }
+  ],
+  "detailed_explanation": "A longer explanation of all findings and recommendations"
+}
+
+${userLevel === 'beginner' 
+  ? 'Explain in simple terms that someone new to crypto would understand. Avoid technical jargon. Use analogies when helpful.'
+  : 'Provide technical details appropriate for an experienced developer or auditor.'}
+
+Always respond with valid JSON only, no additional text.`
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 2000,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response from OpenAI');
+      }
+
+      // Parse the JSON response
+      const result = JSON.parse(content) as LLMAnalysisResult;
+      
+      // Validate and normalize severities
+      result.key_findings = result.key_findings.map(f => ({
+        ...f,
+        severity: this.normalizeSeverity(f.severity)
+      }));
+
+      return result;
+    } catch (error) {
+      console.error('OpenAI LLM analysis failed:', error);
+      // Fall back to mock service
+      return new MockLLMService().analyzeFindingsWithLLM(technicalFindings, oracleData, userLevel);
+    }
+  }
+
+  private buildPrompt(
+    technicalFindings: DetectedVulnerability[],
+    oracleData: OracleData | null,
+    userLevel: UserLevel
+  ): string {
+    let prompt = `Analyze this smart contract security report:\n\n`;
+    
+    if (technicalFindings.length === 0) {
+      prompt += `No vulnerabilities were detected by static analysis.\n\n`;
+    } else {
+      prompt += `DETECTED VULNERABILITIES (${technicalFindings.length} total):\n`;
+      for (const finding of technicalFindings) {
+        prompt += `\n- ${finding.title} [${finding.severity.toUpperCase()}]\n`;
+        prompt += `  Description: ${finding.description}\n`;
+        if (finding.code_snippet) {
+          prompt += `  Code: ${finding.code_snippet}\n`;
+        }
+        if (finding.fix_suggestion) {
+          prompt += `  Suggested fix: ${finding.fix_suggestion}\n`;
+        }
+      }
+    }
+
+    if (oracleData) {
+      prompt += `\nON-CHAIN DATA:\n`;
+      if (oracleData.age_days !== null) prompt += `- Contract age: ${oracleData.age_days} days\n`;
+      if (oracleData.tx_count !== null) prompt += `- Transaction count: ${oracleData.tx_count.toLocaleString()}\n`;
+      if (oracleData.holders_count !== null) prompt += `- Holder count: ${oracleData.holders_count.toLocaleString()}\n`;
+      if (oracleData.tvl_usd !== null) prompt += `- TVL: $${oracleData.tvl_usd.toLocaleString()}\n`;
+      if (oracleData.audit_status !== 'unknown') {
+        prompt += `- Audit status: ${oracleData.audit_status}`;
+        if (oracleData.audit_provider) prompt += ` (by ${oracleData.audit_provider})`;
+        prompt += `\n`;
+      }
+    }
+
+    prompt += `\nUser level: ${userLevel}\n`;
+    prompt += `\nProvide your analysis as a JSON object.`;
+
+    return prompt;
+  }
+
+  private normalizeSeverity(severity: string): Severity {
+    const s = severity.toLowerCase();
+    if (s === 'critical') return 'critical';
+    if (s === 'high') return 'high';
+    if (s === 'medium') return 'medium';
+    return 'low';
+  }
+}
+
+// Mock LLM Service for fallback
 export class MockLLMService implements LLMServiceInterface {
   async analyzeFindingsWithLLM(
     technicalFindings: DetectedVulnerability[],
@@ -234,4 +358,9 @@ export class MockLLMService implements LLMServiceInterface {
   }
 }
 
-export const llmService = new MockLLMService();
+// Use OpenAI service if API key is available, otherwise fall back to mock
+export const llmService = process.env.OPENAI_API_KEY 
+  ? new OpenAILLMService() 
+  : new MockLLMService();
+
+console.log(`🤖 LLM Service: ${process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o-mini' : 'Mock (no API key)'}`);

@@ -4,10 +4,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const API_URL = process.env.API_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || 'http://localhost:3002';
 const WEB_APP_URL = process.env.WEB_APP_URL || 'http://localhost:3000';
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
+const USE_REAL_API = process.env.USE_REAL_API !== 'false'; // Default to true
 
 // Check if we can use web_app buttons (requires HTTPS)
 const IS_HTTPS = WEB_APP_URL.startsWith('https://');
@@ -29,6 +30,52 @@ function filterButtons(buttons: (TelegramBot.InlineKeyboardButton | null)[]): Te
   return buttons.filter((b): b is TelegramBot.InlineKeyboardButton => b !== null);
 }
 
+// ============================================
+// REAL API CALL FUNCTION
+// ============================================
+
+interface APIAnalysis {
+  analysis_id: string;
+  risk_score: number;
+  risk_level: 'low' | 'medium' | 'high' | 'dangerous';
+  summary_short: string;
+  key_findings: Array<{
+    title: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    description: string;
+  }>;
+  oracle_data?: {
+    tvl_usd: number | null;
+    age_days: number | null;
+    tx_count: number | null;
+    holders_count: number | null;
+    audit_status: string;
+  };
+}
+
+async function callBackendAPI(value: string, inputType: 'address' | 'tx_hash'): Promise<APIAnalysis> {
+  const response = await fetch(`${API_URL}/api/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      input_type: inputType,
+      chain_id: 1,
+      value: value,
+      options: {
+        generate_voice: false,
+        user_level: 'beginner',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json() as { message?: string };
+    throw new Error(errorData.message || 'Analysis failed');
+  }
+
+  return response.json() as Promise<APIAnalysis>;
+}
+
 if (!BOT_TOKEN || BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN') {
   console.error('❌ TELEGRAM_BOT_TOKEN is not set. Please set it in .env file.');
   process.exit(1);
@@ -42,10 +89,12 @@ const bot = USE_WEBHOOK && WEBHOOK_URL
 console.log('🤖 LegalChain Telegram Bot is starting...');
 console.log(`📡 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
 console.log(`🌐 Web App URL: ${WEB_APP_URL}`);
-console.log(`🔗 Web App buttons: ${IS_HTTPS ? '✅ Enabled (HTTPS)' : '⚠️  Using regular URL buttons (HTTP - for local dev)'}`);
+console.log(`🔌 Backend API: ${API_URL}`);
+console.log(`🔗 Web App buttons: ${IS_HTTPS ? '✅ Enabled (HTTPS)' : '⚠️  Disabled (HTTP - localhost)'}`);
+console.log(`🤖 Using real API: ${USE_REAL_API ? '✅ Yes' : '❌ Mock data'}`);
 
 // ============================================
-// MOCK DATA - Used until LLM is ready
+// MOCK DATA - Fallback when API is unavailable
 // ============================================
 
 interface MockAnalysis {
@@ -431,48 +480,76 @@ bot.onText(/\/check(?:\s+(.+))?/, async (msg, match) => {
     { parse_mode: 'Markdown' }
   );
 
-  // Simulate analysis delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  try {
+    let analysis: APIAnalysis | MockAnalysis;
+    
+    if (USE_REAL_API) {
+      // Update with progress - fetching source
+      await bot.editMessageText(
+        `🔍 *Analyzing ${inputType === 'address' ? 'Contract' : 'Transaction'}...*\n\n✅ Fetching source code...\n⏳ Running AI security analysis...\n\n\`${value.slice(0, 10)}...${value.slice(-8)}\``,
+        {
+          chat_id: chatId,
+          message_id: scanningMsg.message_id,
+          parse_mode: 'Markdown',
+        }
+      );
+      
+      // Call real backend API
+      analysis = await callBackendAPI(value, inputType);
+      console.log(`✅ Real API analysis completed for ${value.slice(0, 10)}...`);
+    } else {
+      // Simulate analysis delay for mock
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-  // Get mock analysis (random for demo)
-  const analysis = getRandomMockAnalysis();
-  
-  // Update with progress
-  await bot.editMessageText(
-    `🔍 *Analyzing ${inputType === 'address' ? 'Contract' : 'Transaction'}...*\n\n✅ Fetching source code...\n⏳ Running security checks...\n\n\`${value.slice(0, 10)}...${value.slice(-8)}\``,
-    {
-      chat_id: chatId,
-      message_id: scanningMsg.message_id,
-      parse_mode: 'Markdown',
+      // Update with progress
+      await bot.editMessageText(
+        `🔍 *Analyzing ${inputType === 'address' ? 'Contract' : 'Transaction'}...*\n\n✅ Fetching source code...\n⏳ Running security checks...\n\n\`${value.slice(0, 10)}...${value.slice(-8)}\``,
+        {
+          chat_id: chatId,
+          message_id: scanningMsg.message_id,
+          parse_mode: 'Markdown',
+        }
+      );
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Get mock analysis
+      analysis = getRandomMockAnalysis();
     }
-  );
 
-  await new Promise(resolve => setTimeout(resolve, 1500));
+    // Build result message
+    const riskEmoji = getRiskEmoji(analysis.risk_level);
+    const riskBar = getRiskBar(analysis.risk_score);
+    
+    const keyFindingsText = analysis.key_findings
+      .slice(0, 3)
+      .map((f) => `   ${getSeverityEmoji(f.severity)} ${f.title}`)
+      .join('\n');
 
-  // Build result message
-  const riskEmoji = getRiskEmoji(analysis.risk_level);
-  const riskBar = getRiskBar(analysis.risk_score);
-  
-  const keyFindingsText = analysis.key_findings
-    .slice(0, 3)
-    .map((f) => `   ${getSeverityEmoji(f.severity)} ${f.title}`)
-    .join('\n');
+    // Handle oracle data - may be null/undefined from real API
+    const oracleData = analysis.oracle_data || {
+      tvl_usd: null,
+      age_days: null,
+      tx_count: null,
+      holders_count: null,
+      audit_status: 'unknown'
+    };
+    
+    const oracleText = [
+      `💰 TVL: ${oracleData.tvl_usd ? '$' + formatNumber(oracleData.tvl_usd) : 'N/A'}`,
+      `📅 Age: ${oracleData.age_days ? oracleData.age_days + ' days' : 'N/A'}`,
+      `📊 Txns: ${oracleData.tx_count ? formatNumber(oracleData.tx_count) : 'N/A'}`,
+      `👥 Holders: ${oracleData.holders_count ? formatNumber(oracleData.holders_count) : 'N/A'}`,
+    ].join(' • ');
 
-  const oracleText = [
-    `💰 TVL: $${formatNumber(analysis.oracle_data.tvl_usd)}`,
-    `📅 Age: ${analysis.oracle_data.age_days} days`,
-    `📊 Txns: ${formatNumber(analysis.oracle_data.tx_count)}`,
-    `👥 Holders: ${formatNumber(analysis.oracle_data.holders_count)}`,
-  ].join(' • ');
+    const auditBadge = oracleData.audit_status === 'audited' 
+      ? '✅ Audited' 
+      : oracleData.audit_status === 'none'
+      ? '⚠️ Not Audited'
+      : '❓ Unknown';
 
-  const auditBadge = analysis.oracle_data.audit_status === 'audited' 
-    ? '✅ Audited' 
-    : analysis.oracle_data.audit_status === 'none'
-    ? '⚠️ Not Audited'
-    : '❓ Unknown';
-
-  const resultMessage = `
-✅ *Analysis Complete*
+    const resultMessage = `
+✅ *Analysis Complete*${USE_REAL_API ? ' (AI-Powered)' : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━
 
@@ -499,27 +576,45 @@ ${oracleText}
 
 📍 *${inputType === 'address' ? 'Contract' : 'Transaction'}:*
 \`${value}\`
-  `.trim();
+    `.trim();
 
-  const analysisButton = createWebButton('📊 Full Analysis', `${WEB_APP_URL}/telegram?analysis_id=${analysis.analysis_id}&address=${value}`);
-  
-  await bot.editMessageText(resultMessage, {
-    chat_id: chatId,
-    message_id: scanningMsg.message_id,
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        ...(analysisButton ? [[analysisButton]] : []),
-        [
-          { text: '🎧 Listen Summary', callback_data: `voice_${analysis.analysis_id}` },
-          { text: '📤 Share', callback_data: `share_${analysis.analysis_id}` },
+    const analysisButton = createWebButton('📊 Full Analysis', `${WEB_APP_URL}/telegram?analysis_id=${analysis.analysis_id}&address=${value}`);
+    
+    await bot.editMessageText(resultMessage, {
+      chat_id: chatId,
+      message_id: scanningMsg.message_id,
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          ...(analysisButton ? [[analysisButton]] : []),
+          [
+            { text: '🎧 Listen Summary', callback_data: `voice_${analysis.analysis_id}` },
+            { text: '📤 Share', callback_data: `share_${analysis.analysis_id}` },
+          ],
+          [
+            { text: '🔄 Scan Another', callback_data: 'prompt_scan' },
+          ],
         ],
-        [
-          { text: '🔄 Scan Another', callback_data: 'prompt_scan' },
-        ],
-      ],
-    },
-  });
+      },
+    });
+  } catch (error) {
+    console.error('❌ Analysis error:', error);
+    
+    // Show error and offer to try mock analysis
+    await bot.editMessageText(
+      `❌ *Analysis Failed*\n\n${error instanceof Error ? error.message : 'Unknown error occurred'}\n\n_The backend server may be unavailable. Please try again later._`,
+      {
+        chat_id: chatId,
+        message_id: scanningMsg.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔄 Try Again', callback_data: 'prompt_scan' }],
+          ],
+        },
+      }
+    );
+  }
 });
 
 // ============================================
