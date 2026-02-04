@@ -261,12 +261,9 @@ export class EtherscanBlockchainService implements BlockchainServiceInterface {
   }
 
   async getContractFromTxHash(txHash: string, chainId: number): Promise<string> {
-    const baseUrl = this.baseUrls[chainId] || this.baseUrls[1];
-    
     try {
-      const response = await fetch(
-        `${baseUrl}?module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${this.apiKey}`
-      );
+      const url = this.buildUrl({ module: 'proxy', action: 'eth_getTransactionByHash', txhash: txHash }, chainId);
+      const response = await fetch(url);
       const data = await response.json() as {
         result?: { to?: string };
       };
@@ -423,7 +420,7 @@ export class EtherscanBlockchainService implements BlockchainServiceInterface {
         tvl_usd: tvlUsd,
         volume_24h_usd: null, // Would need DeFiLlama integration
         age_days: ageDays,
-        tx_count: recentTxCount || txCount,
+        tx_count: recentTxCount,
         holders_count: holdersCount,
         audit_status: 'unknown', // Would need integration with audit databases
         audit_provider: null,
